@@ -118,7 +118,6 @@ export class RelayController {
   pauseForInput(): void {
     if (this.wait.state !== "waiting") return;
     this.wait.pause();
-    this.checkpoint("paused", true);
     this.context?.ui.notify("Saved Relay task paused; use /relay wait resume", "warning");
   }
 
@@ -133,7 +132,7 @@ export class RelayController {
       const valid = await ensureValidToken(this.vault, profile, signal);
       const current = await this.vault.getProfile(profile.id) ?? { ...profile, credential: valid };
       await this.refreshProfile(current, true, signal);
-      await this.log.write("profile-add", { profile: fingerprint(profile.id), label: profile.label });
+      await this.log.write("profile-add", { profile: fingerprint(profile.id) });
       return await this.vault.getProfile(profile.id) ?? profile;
     } catch (error) {
       if (!(error instanceof UsageError && error.kind === "transient")) { await this.vault.remove(profile.id); throw error; }
@@ -147,12 +146,17 @@ export class RelayController {
     if (!current) return;
     const credential = await ensureValidToken(this.vault, current, signal);
     const quota = await fetchUsage(credential, signal);
-    await this.vault.update(profile.id, (value) => { value.quota = quota; value.needsLogin = false; });
+    await this.vault.update(profile.id, (value) => {
+      value.quota = quota;
+      value.needsLogin = false;
+      if (limitingRemaining(quota) === 0) value.exhaustedUntil = earliestFutureReset(value) ?? Date.now() + 60_000;
+      else if ((value.exhaustedUntil ?? 0) <= Date.now()) delete value.exhaustedUntil;
+    });
     await this.log.write("usage-result", { profile: fingerprint(profile.id), remaining: limitingRemaining(quota) });
   }
 
   async freshProfiles(): Promise<RelayProfile[]> {
-    const profiles = (await this.vault.listProfiles()).filter((profile) => profile.enabled);
+    const profiles = (await this.vault.listProfiles()).filter((profile) => profile.enabled && !profile.needsLogin);
     await Promise.allSettled(profiles.map((profile) => this.refreshProfile(profile)));
     return this.vault.listProfiles();
   }
@@ -187,7 +191,13 @@ export class RelayController {
     return this.wait.state === "waiting";
   }
 
-  overrideWait(profile: RelayProfile): void { this.wait.cancel(); this.pin(profile.id); this.queueResume(profile); }
+  overrideWait(profile: RelayProfile): void {
+    this.pin(profile.id);
+    if (this.pending || this.restoredCheckpoint?.phase === "paused" || this.restoredCheckpoint?.phase === "waiting" || this.restoredCheckpoint?.phase === "continuing") {
+      this.wait.cancel();
+      this.queueResume(profile);
+    } else this.wait.override();
+  }
 
   clearProfileReferences(id: string): void {
     if (this.pinnedProfileId === id) this.pinnedProfileId = undefined;
@@ -267,7 +277,9 @@ export class RelayController {
   }
 
   private checkpoint(phase: SessionRelayState["phase"], continuationPending: boolean, requestId?: string, profileId?: string): void {
-    this.pi.appendEntry("pi-relay-state", { version: 1, phase, continuationPending, ...(requestId ? { requestId } : {}), ...(profileId ? { activeProfileId: profileId } : {}), updatedAt: Date.now() } satisfies SessionRelayState);
+    const state = { version: 1, phase, continuationPending, ...(requestId ? { requestId } : {}), ...(profileId ? { activeProfileId: profileId } : {}), updatedAt: Date.now() } satisfies SessionRelayState;
+    this.restoredCheckpoint = state;
+    this.pi.appendEntry("pi-relay-state", state);
   }
 
   private waitChanged(state: "idle" | "waiting" | "paused", wake?: { profile: RelayProfile; at: number }): void {

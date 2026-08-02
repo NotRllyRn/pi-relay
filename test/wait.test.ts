@@ -35,3 +35,11 @@ test("pause preserves paused state", async () => {
   controller.resume();
   assert.equal(controller.state, "idle");
 });
+
+test("override wakes a live wait immediately", async () => {
+  const controller = new WaitController(async () => undefined, undefined, 0);
+  const pending = controller.wait([profile("a", Date.now() + 100)]);
+  controller.override();
+  assert.equal(await pending, true);
+  assert.equal(controller.state, "idle");
+});

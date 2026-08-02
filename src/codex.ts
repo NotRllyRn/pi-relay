@@ -73,4 +73,4 @@ export const classifyFailure = (error: unknown): Failure => {
 };
 
 const errorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
-const sanitizeError = (error: unknown): string => errorMessage(error).replace(/(?:access|refresh)[_-]?token["' :=]+\S+/gi, "$1token [redacted]");
+const sanitizeError = (error: unknown): string => errorMessage(error).replace(/(?:access|refresh)[_-]?token["' :=]+\S+/gi, "token [redacted]");

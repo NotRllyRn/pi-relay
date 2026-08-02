@@ -11,6 +11,7 @@ export const earliestWake = (profiles: RelayProfile[], now = Date.now()): { prof
 export class WaitController {
   private timer: NodeJS.Timeout | undefined;
   private resolve: ((value: boolean) => void) | undefined;
+  private overridden = false;
   state: "idle" | "waiting" | "paused" = "idle";
 
   constructor(
@@ -23,14 +24,22 @@ export class WaitController {
     const next = earliestWake(profiles);
     if (!next || signal?.aborted) return false;
     this.clear();
+    this.overridden = false;
     this.state = "waiting";
     this.changed("waiting", next);
     const woke = await new Promise<boolean>((resolve) => {
-      const finish = (value: boolean) => { this.clearTimer(); resolve(value); };
+      const finish = (value: boolean) => {
+        if (this.resolve !== finish) return;
+        signal?.removeEventListener("abort", onAbort);
+        this.clearTimer();
+        resolve(value);
+      };
+      const onAbort = () => finish(false);
       this.resolve = finish;
       this.timer = setTimeout(() => finish(true), Math.max(0, next.at + this.graceMs - Date.now()));
-      signal?.addEventListener("abort", () => finish(false), { once: true });
+      signal?.addEventListener("abort", onAbort, { once: true });
     });
+    if (this.overridden) { this.overridden = false; return true; }
     if (!woke || this.state !== "waiting") return false;
     await this.wake(next.profile);
     this.state = "idle";
@@ -41,8 +50,9 @@ export class WaitController {
   cancel(): void { this.stop(false); this.state = "idle"; this.changed("idle"); }
   pause(): void { this.stop(false); this.state = "paused"; this.changed("paused"); }
   resume(): void { if (this.state === "paused") { this.state = "idle"; this.changed("idle"); } }
+  override(): void { this.overridden = true; this.stop(true); this.state = "idle"; this.changed("idle"); }
 
   private clear(): void { this.stop(false); this.state = "idle"; }
-  private stop(value: boolean): void { const resolve = this.resolve; this.clearTimer(); resolve?.(value); }
+  private stop(value: boolean): void { this.resolve ? this.resolve(value) : this.clearTimer(); }
   private clearTimer(): void { if (this.timer) clearTimeout(this.timer); this.timer = undefined; this.resolve = undefined; }
 }

@@ -20,7 +20,7 @@ export class RelayLog {
     if (this.failed) return;
     try {
       await mkdir(dirname(this.path), { recursive: true, mode: 0o700 });
-      if ((await stat(this.path).catch(() => undefined))?.size && (await stat(this.path)).size >= this.maxBytes) await this.rotate();
+      if (((await stat(this.path).catch(() => undefined))?.size ?? 0) >= this.maxBytes) await this.rotate();
       await appendFile(this.path, `${JSON.stringify(redact({ ts: new Date().toISOString(), event, ...data }))}\n`, { mode: 0o600 });
       await chmod(this.path, 0o600);
     } catch { this.failed = true; }

@@ -110,5 +110,6 @@ export async function resolveAccount(controller: RelayController, argument: stri
 
 const output = (context: ExtensionCommandContext, text: string, level: "info" | "error" = "info") => {
   if (context.hasUI) context.ui.notify(text, level);
-  else console.log(text);
+  else if (context.mode === "print") console.log(text);
+  else console.error(text);
 };

@@ -85,8 +85,9 @@ export class Vault {
       try { await mkdir(this.lockPath); break; }
       catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-        const age = Date.now() - (await stat(this.lockPath)).mtimeMs;
-        if (age > LOCK_STALE_MS) await rm(this.lockPath, { recursive: true, force: true });
+        const lock = await stat(this.lockPath).catch(() => undefined);
+        if (!lock) continue;
+        if (Date.now() - lock.mtimeMs > LOCK_STALE_MS) await rm(this.lockPath, { recursive: true, force: true });
         else await sleep(20);
       }
     }

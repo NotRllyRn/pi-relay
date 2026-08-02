@@ -35,18 +35,21 @@ export function streamRelay(
   model: Model<Api>, context: Context, options: SimpleStreamOptions = {}, dependencies: RelayStreamDependencies,
 ): AssistantMessageEventStream {
   const outer = createAssistantMessageEventStream();
-  void run(model, context, options, dependencies, outer).catch((error) => {
-    outer.push({ type: "error", reason: options.signal?.aborted ? "aborted" : "error", error: errorMessage(model, error, options.signal?.aborted) });
+  const state = { started: false };
+  void run(model, context, options, dependencies, outer, state).catch((error) => {
+    const aborted = options.signal?.aborted ?? false;
+    if (!state.started) outer.push({ type: "start", partial: emptyMessage(model, "pending") });
+    outer.push({ type: "error", reason: aborted ? "aborted" : "error", error: errorMessage(model, error, aborted) });
     outer.end();
   });
   return outer;
 }
 
 async function run(
-  model: Model<Api>, context: Context, options: SimpleStreamOptions, dependencies: RelayStreamDependencies, outer: AssistantMessageEventStream,
+  model: Model<Api>, context: Context, options: SimpleStreamOptions, dependencies: RelayStreamDependencies, outer: AssistantMessageEventStream, state: { started: boolean },
 ): Promise<void> {
   const requestId = randomUUID(), attempted = new Set<string>();
-  let meaningful = false, outerStart = false, previous: RelayProfile | undefined, lastError: AssistantMessage | undefined;
+  let meaningful = false, previous: RelayProfile | undefined, lastError: AssistantMessage | undefined;
   for (let pass = 1; pass <= 3; pass++) {
     for (;;) {
       if (options.signal?.aborted) throw new Error("Request aborted");
@@ -59,8 +62,6 @@ async function run(
         break;
       }
       attempted.add(profile.id);
-      await dependencies.selected?.(profile, previous, selection);
-      previous = profile;
       let credential: RelayProfile["credential"];
       try { credential = await dependencies.prepare(profile, options.signal); }
       catch (error) {
@@ -69,11 +70,14 @@ async function run(
         if (failure.kind === "auth") continue;
         throw error;
       }
+      await dependencies.selected?.(profile, previous, selection);
+      previous = profile;
       const inner = dependencies.stream(model, context, { ...options, apiKey: credential.access }, profile);
       let retry = false;
       for await (const event of inner) {
         if (event.type === "start") {
-          if (!outerStart) { outer.push(event); outerStart = true; }
+          // A protocol start is not meaningful output, and transparent retries expose it only once.
+          if (!state.started) { outer.push(event); state.started = true; }
           continue;
         }
         if (isMeaningful(event)) meaningful = true;
@@ -94,13 +98,16 @@ async function run(
     }
     if (pass < 3) attempted.clear();
   }
-  if (lastError) outer.push({ type: "error", reason: "error", error: lastError });
-  else outer.push({ type: "error", reason: "error", error: errorMessage(model, "No eligible Codex account") });
+  const terminal = lastError ?? errorMessage(model, "No eligible Codex account");
+  if (!state.started) outer.push({ type: "start", partial: emptyMessage(model, "pending") });
+  outer.push({ type: "error", reason: terminal.stopReason === "aborted" ? "aborted" : "error", error: terminal });
   outer.end();
 }
 
-const errorMessage = (model: Model<Api>, error: unknown, aborted = false): AssistantMessage => ({
+const emptyMessage = (model: Model<Api>, stopReason: AssistantMessage["stopReason"], errorMessage?: string): AssistantMessage => ({
   role: "assistant", content: [], api: model.api, provider: model.provider, model: model.id,
   usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-  stopReason: aborted ? "aborted" : "error", errorMessage: error instanceof Error ? error.message : String(error), timestamp: Date.now(),
+  stopReason, ...(errorMessage ? { errorMessage } : {}), timestamp: Date.now(),
 });
+const errorMessage = (model: Model<Api>, error: unknown, aborted = false): AssistantMessage =>
+  emptyMessage(model, aborted ? "aborted" : "error", error instanceof Error ? error.message : String(error));

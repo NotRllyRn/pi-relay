@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -26,6 +26,15 @@ test("concurrent changes preserve profiles", async () => {
   const { vault } = await setup();
   await Promise.all(Array.from({ length: 8 }, (_, index) => vault.add({ label: `${index}`, credential: credential(`${index}`) })));
   assert.equal((await vault.listProfiles()).length, 8);
+});
+
+test("recovers a stale lock", async () => {
+  const { vault } = await setup();
+  await mkdir(vault.lockPath, { recursive: true });
+  const stale = new Date(Date.now() - 60_000);
+  await utimes(vault.lockPath, stale, stale);
+  const profile = await vault.add({ label: "One", credential: credential() });
+  assert.equal((await vault.getProfile(profile.id))?.label, "One");
 });
 
 test("generation compare-and-swap rejects stale refresh", async () => {

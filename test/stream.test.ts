@@ -62,3 +62,9 @@ test("bounds attempts to three passes", async () => {
   await collect(fixture.deps);
   assert.deepEqual(fixture.attempts, ["a", "a", "a"]);
 });
+
+test("no eligible account still emits a valid start and error", async () => {
+  const fixture = dependencies(() => events(), []);
+  const output = await collect(fixture.deps);
+  assert.deepEqual(output.map((event) => event.type), ["start", "error"]);
+});
