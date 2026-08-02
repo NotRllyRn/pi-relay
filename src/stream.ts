@@ -10,7 +10,7 @@ import {
 } from "@earendil-works/pi-ai";
 import { randomUUID } from "node:crypto";
 import { classifyFailure } from "./codex.js";
-import { selectProfile, type SelectionOverrides } from "./select.js";
+import { selectProfile, type Selection, type SelectionOverrides } from "./select.js";
 import type { Failure, Policy, RelayProfile } from "./types.js";
 
 export type RelayStreamDependencies = {
@@ -21,7 +21,7 @@ export type RelayStreamDependencies = {
   stream(model: Model<Api>, context: Context, options: SimpleStreamOptions, profile: RelayProfile): AssistantMessageEventStream;
   failure(profile: RelayProfile, failure: Failure): Promise<void>;
   success(profile: RelayProfile): Promise<void>;
-  selected?(profile: RelayProfile, previous?: RelayProfile): void;
+  selected?(profile: RelayProfile, previous: RelayProfile | undefined, selection: Selection): void | Promise<void>;
   continuation?(details: { requestId: string; profile: RelayProfile; failure: Failure }): void;
   wait?(profiles: RelayProfile[], signal?: AbortSignal): Promise<boolean>;
 };
@@ -59,7 +59,7 @@ async function run(
         break;
       }
       attempted.add(profile.id);
-      dependencies.selected?.(profile, previous);
+      await dependencies.selected?.(profile, previous, selection);
       previous = profile;
       let credential: RelayProfile["credential"];
       try { credential = await dependencies.prepare(profile, options.signal); }
