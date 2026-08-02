@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import type { OAuthCredential } from "@earendil-works/pi-ai";
-import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex";
+import type { OAuthCredential, Provider } from "@earendil-works/pi-ai";
+import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
 import type { Failure, RelayProfile } from "./types.js";
 import type { Vault } from "./vault.js";
 
@@ -49,12 +49,18 @@ export const duplicateProfile = (
 			fingerprint(credential.refresh),
 	);
 
+export const codexProvider = (): Provider<"openai-codex-responses"> => {
+	const provider = builtinProviders().find(({ id }) => id === "openai-codex");
+	if (!provider) throw new Error("Pi Codex provider is unavailable");
+	return provider as Provider<"openai-codex-responses">;
+};
+
 export type RefreshToken = (
 	credential: OAuthCredential,
 	signal?: AbortSignal,
 ) => Promise<OAuthCredential>;
 const refreshCodex: RefreshToken = (credential, signal) => {
-	const refresh = openaiCodexProvider().auth.oauth?.refresh;
+	const refresh = codexProvider().auth.oauth?.refresh;
 	if (!refresh) throw new Error("Pi Codex OAuth refresh is unavailable");
 	return refresh(credential, signal);
 };

@@ -3,8 +3,8 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { codexProvider } from "../src/codex.js";
 import { RelayLog } from "../src/log.js";
 import { RelayController } from "../src/pi.js";
 import { Vault } from "../src/vault.js";
@@ -26,7 +26,7 @@ test("provider preserves Codex identity and model catalog", async () => {
 	assert.equal(provider.id, "openai-codex");
 	assert.deepEqual(
 		provider.getModels().map((model) => model.id),
-		openaiCodexProvider()
+		codexProvider()
 			.getModels()
 			.map((model) => model.id),
 	);

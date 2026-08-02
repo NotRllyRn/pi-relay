@@ -6,13 +6,13 @@ import type {
 	Provider,
 	SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
-import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex";
 import type {
 	ExtensionAPI,
 	ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { readStoredCredential } from "@earendil-works/pi-coding-agent";
 import {
+	codexProvider,
 	duplicateProfile,
 	ensureValidToken,
 	fingerprint,
@@ -73,7 +73,7 @@ export class RelayController {
 			pi,
 			vault,
 			log,
-			openaiCodexProvider(),
+			codexProvider(),
 		);
 		await controller.migrate();
 		await log.write("start", { version: "0.1.0" });
