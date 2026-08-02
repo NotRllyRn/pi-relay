@@ -69,12 +69,7 @@ export class RelayController {
 		vault: Vault,
 		log: RelayLog,
 	): Promise<RelayController> {
-		const controller = new RelayController(
-			pi,
-			vault,
-			log,
-			codexProvider(),
-		);
+		const controller = new RelayController(pi, vault, log, codexProvider());
 		await controller.migrate();
 		await log.write("start", { version: "0.1.0" });
 		return controller;
