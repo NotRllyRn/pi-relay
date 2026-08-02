@@ -5,7 +5,7 @@ Pi extension that uses multiple OpenAI Codex accounts, selects available quota, 
 ## Install
 
 ```sh
-pi install npm:pi-relay
+pi install git:github.com/NotRllyRn/pi-relay
 ```
 
 Restart Pi.
