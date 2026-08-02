@@ -21,6 +21,8 @@ export async function fetchUsage(
       headers: {
         Authorization: `Bearer ${credential.access}`,
         Accept: "application/json",
+        Referer: "https://chatgpt.com/codex/settings/usage",
+        "X-OpenAI-Target-Path": "/backend-api/wham/usage",
         ...(credential.accountId ? { "ChatGPT-Account-Id": credential.accountId } : {}),
       },
       signal: linked,
@@ -36,27 +38,39 @@ export async function fetchUsage(
   const body: unknown = await response.json().catch(() => undefined);
   if (!body || typeof body !== "object") throw new UsageError("invalid-response", "Invalid Codex usage response");
   const value = body as Record<string, unknown>;
-  const primary = parseWindow(value.rate_limit ?? value.primary);
-  const secondary = parseWindow(value.secondary_rate_limit ?? value.secondary);
+  const rateLimit = record(value.rate_limit) ?? value;
+  const primary = parseWindow(rateLimit.primary_window ?? value.primary ?? rateLimit, now);
+  const secondary = parseWindow(rateLimit.secondary_window ?? value.secondary_rate_limit ?? value.secondary, now);
   if (!primary && !secondary) throw new UsageError("invalid-response", "Codex usage windows are missing");
   return { ...(primary ? { primary } : {}), ...(secondary ? { secondary } : {}), fetchedAt: now };
 }
 
-const parseWindow = (input: unknown): QuotaWindow | undefined => {
-  if (!input || typeof input !== "object") return undefined;
-  const value = input as Record<string, unknown>;
-  const window = value.limit_window && typeof value.limit_window === "object" ? value.limit_window as Record<string, unknown> : value;
+const parseWindow = (input: unknown, now: number): QuotaWindow | undefined => {
+  const value = record(input);
+  if (!value) return undefined;
+  const window = record(value.limit_window) ?? value;
   const usedPercent = number(value.used_percent ?? window.used_percent);
-  const resetSeconds = number(value.reset_at ?? window.reset_at);
+  const resetAt = resetTime(value.reset_at ?? window.reset_at, value.reset_after_seconds ?? window.reset_after_seconds, now);
   const windowSeconds = number(value.limit_window_seconds ?? window.limit_window_seconds);
-  if (usedPercent === undefined && resetSeconds === undefined && windowSeconds === undefined) return undefined;
+  if (usedPercent === undefined && resetAt === undefined && windowSeconds === undefined) return undefined;
   return {
     ...(usedPercent === undefined ? {} : { usedPercent }),
-    ...(resetSeconds === undefined ? {} : { resetAt: resetSeconds * 1000 }),
+    ...(resetAt === undefined ? {} : { resetAt }),
     ...(windowSeconds === undefined ? {} : { windowSeconds }),
   };
 };
-const number = (value: unknown): number | undefined => typeof value === "number" && Number.isFinite(value) ? value : undefined;
+const record = (value: unknown): Record<string, unknown> | undefined => value && typeof value === "object" ? value as Record<string, unknown> : undefined;
+const number = (value: unknown): number | undefined => {
+  const parsed = typeof value === "string" && value.trim() ? Number(value) : value;
+  return typeof parsed === "number" && Number.isFinite(parsed) ? parsed : undefined;
+};
+const resetTime = (reset: unknown, after: unknown, now: number): number | undefined => {
+  if (typeof reset === "string" && !Number.isFinite(Number(reset))) { const parsed = Date.parse(reset); return Number.isFinite(parsed) ? parsed : undefined; }
+  const epoch = number(reset);
+  if (epoch !== undefined) return epoch < 10_000_000_000 ? epoch * 1000 : epoch;
+  const seconds = number(after);
+  return seconds === undefined ? undefined : now + seconds * 1000;
+};
 export const remaining = (window?: QuotaWindow): number | undefined => window?.usedPercent === undefined ? undefined : Math.max(0, 100 - window.usedPercent);
 export const limitingRemaining = (quota?: CodexQuotaSnapshot): number | undefined => minDefined(remaining(quota?.primary), remaining(quota?.secondary));
 export const isFresh = (quota: CodexQuotaSnapshot | undefined, now = Date.now()): boolean => !!quota && now - quota.fetchedAt < USAGE_TTL_MS && ![quota.primary?.resetAt, quota.secondary?.resetAt].some((reset) => reset !== undefined && reset <= now);

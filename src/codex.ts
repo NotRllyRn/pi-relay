@@ -12,8 +12,9 @@ export const jwtMetadata = (token: string): JwtMetadata => {
   try {
     const payload = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString()) as Record<string, unknown>;
     const expires = typeof payload.exp === "number" ? payload.exp * 1000 : undefined;
-    const accountId = typeof payload["https://api.openai.com/auth.chatgpt_account_id"] === "string"
-      ? payload["https://api.openai.com/auth.chatgpt_account_id"] : undefined;
+    const auth = payload["https://api.openai.com/auth"];
+    const accountId = auth && typeof auth === "object" && typeof (auth as Record<string, unknown>).chatgpt_account_id === "string"
+      ? (auth as Record<string, string>).chatgpt_account_id : undefined;
     return { ...(expires === undefined ? {} : { expires }), ...(accountId === undefined ? {} : { accountId }) };
   } catch { return {}; }
 };

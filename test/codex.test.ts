@@ -14,7 +14,7 @@ const setup = async (expires = Date.now() - 1) => {
 };
 
 test("decodes JWT metadata without trusting malformed input", () => {
-  const metadata = jwtMetadata(jwt({ exp: 123, "https://api.openai.com/auth.chatgpt_account_id": "account" }));
+  const metadata = jwtMetadata(jwt({ exp: 123, "https://api.openai.com/auth": { chatgpt_account_id: "account" } }));
   assert.deepEqual(metadata, { expires: 123000, accountId: "account" });
   assert.deepEqual(jwtMetadata("bad"), {});
   assert.equal(fingerprint("secret").length, 8);
