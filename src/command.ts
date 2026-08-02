@@ -178,8 +178,14 @@ async function showMenu(
 	}
 	if (action === "Quota Wait") return waitMenu(context, controller);
 	if (action === "Refresh usage") {
-		const profile = await selectAccount(context, controller, "Refresh usage", true);
-		if (profile !== undefined) await handle(`refresh ${profile?.id ?? "all"}`, context, controller);
+		const profile = await selectAccount(
+			context,
+			controller,
+			"Refresh usage",
+			true,
+		);
+		if (profile !== undefined)
+			await handle(`refresh ${profile?.id ?? "all"}`, context, controller);
 		return;
 	}
 	const profile = await selectAccount(context, controller, action);
@@ -189,13 +195,22 @@ async function showMenu(
 			return handle(`use ${profile.id}`, context, controller);
 		case "Rename account": {
 			const label = await context.ui.input("New account name", profile.label);
-			if (label?.trim()) await handle(`rename ${profile.id} ${label.trim()}`, context, controller);
+			if (label?.trim())
+				await handle(
+					`rename ${profile.id} ${label.trim()}`,
+					context,
+					controller,
+				);
 			return;
 		}
 		case "Delete account":
 			return handle(`delete ${profile.id}`, context, controller);
 		case "Enable / disable account":
-			return handle(`${profile.enabled ? "disable" : "enable"} ${profile.id}`, context, controller);
+			return handle(
+				`${profile.enabled ? "disable" : "enable"} ${profile.id}`,
+				context,
+				controller,
+			);
 		case "Prioritize account":
 			return handle(`prioritize ${profile.id}`, context, controller);
 		case "Skip account until reset":
@@ -212,9 +227,12 @@ async function selectAccount(
 	const profiles = await controller.vault.listProfiles();
 	const choices = [
 		...(includeAll ? ["All accounts"] : []),
-		...profiles.map((profile) => `${profile.label} · ${profile.id.slice(0, 8)}`),
+		...profiles.map(
+			(profile) => `${profile.label} · ${profile.id.slice(0, 8)}`,
+		),
 	];
-	if (!choices.length) throw new Error("No Relay accounts; choose Add account first");
+	if (!choices.length)
+		throw new Error("No Relay accounts; choose Add account first");
 	const choice = await context.ui.select(title, choices);
 	if (!choice) return undefined;
 	if (choice === "All accounts") return null;
@@ -225,10 +243,21 @@ async function waitMenu(
 	context: ExtensionCommandContext,
 	controller: RelayController,
 ): Promise<void> {
-	const action = await context.ui.select("Quota Wait", ["Status", "Pause", "Resume", "Cancel", "Override account"]);
+	const action = await context.ui.select("Quota Wait", [
+		"Status",
+		"Pause",
+		"Resume",
+		"Cancel",
+		"Override account",
+	]);
 	if (!action) return;
-	if (action !== "Override account") return waitCommand(action.toLowerCase(), [], context, controller);
-	const profile = await selectAccount(context, controller, "Override with account");
+	if (action !== "Override account")
+		return waitCommand(action.toLowerCase(), [], context, controller);
+	const profile = await selectAccount(
+		context,
+		controller,
+		"Override with account",
+	);
 	if (profile) await waitCommand("override", [profile.id], context, controller);
 }
 

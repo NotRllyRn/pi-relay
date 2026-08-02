@@ -613,10 +613,7 @@ export class RelayController {
 			this.context?.ui.notify("Relay entered Quota Wait", "warning");
 		} else if (state === "paused") {
 			this.checkpoint("paused", !!this.pending, this.pending?.requestId);
-			this.context?.ui.setStatus(
-				"pi-relay",
-				"Relay: PAUSED | open /relay",
-			);
+			this.context?.ui.setStatus("pi-relay", "Relay: PAUSED | open /relay");
 			this.context?.ui.setWidget("pi-relay", undefined);
 		} else {
 			this.context?.ui.setWidget("pi-relay", undefined);

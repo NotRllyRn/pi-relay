@@ -67,12 +67,17 @@ test("renames the imported Default profile", async () => {
 });
 
 test("root menu renames and deletes profiles", async () => {
-	const vault = new Vault(join(await mkdtemp(join(tmpdir(), "relay-menu-")), "state.json"));
+	const vault = new Vault(
+		join(await mkdtemp(join(tmpdir(), "relay-menu-")), "state.json"),
+	);
 	const profile = await vault.add({
 		label: "Default",
 		credential: { access: "a", refresh: "r", expires: 1 },
 	});
-	let handler: (input: string, context: ExtensionCommandContext) => Promise<void> | void = () => {};
+	let handler: (
+		input: string,
+		context: ExtensionCommandContext,
+	) => Promise<void> | void = () => {};
 	const controller = {
 		vault,
 		freshProfiles: () => vault.listProfiles(),
@@ -81,7 +86,17 @@ test("root menu renames and deletes profiles", async () => {
 		overrides: () => ({}),
 		clearProfileReferences() {},
 	} as unknown as RelayController;
-	registerRelayCommand({ registerCommand: (_name: string, command: { handler: typeof handler }) => { handler = command.handler; } } as unknown as ExtensionAPI, controller);
+	registerRelayCommand(
+		{
+			registerCommand: (
+				_name: string,
+				command: { handler: typeof handler },
+			) => {
+				handler = command.handler;
+			},
+		} as unknown as ExtensionAPI,
+		controller,
+	);
 	const choices = ["Rename account", `Default · ${profile.id.slice(0, 8)}`];
 	await handler("", {
 		hasUI: true,
@@ -97,7 +112,11 @@ test("root menu renames and deletes profiles", async () => {
 	await handler("", {
 		hasUI: true,
 		mode: "tui",
-		ui: { notify() {}, select: async () => choices.shift(), confirm: async () => true },
+		ui: {
+			notify() {},
+			select: async () => choices.shift(),
+			confirm: async () => true,
+		},
 	} as unknown as ExtensionCommandContext);
 	assert.equal(await vault.getProfile(profile.id), undefined);
 });

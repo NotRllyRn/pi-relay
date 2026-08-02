@@ -12,13 +12,32 @@ import { Vault } from "../src/vault.js";
 test("pin and unpin update the displayed account immediately", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "relay-pin-"));
 	const vault = new Vault(join(directory, "state.json"));
-	await vault.change((state) => { state.migratedNativeAuth = true; });
-	await vault.add({ label: "Default", credential: { access: "a", refresh: "r", expires: 1 } });
-	const other = await vault.add({ label: "Other", credential: { access: "b", refresh: "r2", expires: 1 } });
+	await vault.change((state) => {
+		state.migratedNativeAuth = true;
+	});
+	await vault.add({
+		label: "Default",
+		credential: { access: "a", refresh: "r", expires: 1 },
+	});
+	const other = await vault.add({
+		label: "Other",
+		credential: { access: "b", refresh: "r2", expires: 1 },
+	});
 	let status = "";
 	const pi = { appendEntry() {}, sendMessage() {} } as unknown as ExtensionAPI;
-	const controller = await RelayController.create(pi, vault, new RelayLog(join(directory, "relay.log")));
-	controller.attachContext({ ui: { setStatus: (_key: string, value: string) => { status = value; }, setWidget() {} } } as never);
+	const controller = await RelayController.create(
+		pi,
+		vault,
+		new RelayLog(join(directory, "relay.log")),
+	);
+	controller.attachContext({
+		ui: {
+			setStatus: (_key: string, value: string) => {
+				status = value;
+			},
+			setWidget() {},
+		},
+	} as never);
 	controller.pin(other);
 	assert.equal(status, "Relay: Other | pinned");
 	assert.equal((await controller.unpin())?.label, "Default");
