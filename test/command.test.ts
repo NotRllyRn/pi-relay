@@ -3,7 +3,10 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type {
+	ExtensionAPI,
+	ExtensionCommandContext,
+} from "@earendil-works/pi-coding-agent";
 import { registerRelayCommand, resolveAccount } from "../src/command.js";
 import type { RelayController } from "../src/pi.js";
 import { Vault } from "../src/vault.js";
@@ -34,15 +37,28 @@ test("resolves exact id, label, and unique prefix", async () => {
 });
 
 test("renames the imported Default profile", async () => {
-	const vault = new Vault(join(await mkdtemp(join(tmpdir(), "relay-rename-")), "state.json"));
+	const vault = new Vault(
+		join(await mkdtemp(join(tmpdir(), "relay-rename-")), "state.json"),
+	);
 	const profile = await vault.add({
 		label: "Default",
 		credential: { access: "a", refresh: "r", expires: 1 },
 	});
-	let handler: (input: string, context: ExtensionCommandContext) => Promise<void> | void = () => {};
-	registerRelayCommand({
-		registerCommand: (_name: string, command: { handler: typeof handler }) => { handler = command.handler; },
-	} as unknown as ExtensionAPI, { vault } as RelayController);
+	let handler: (
+		input: string,
+		context: ExtensionCommandContext,
+	) => Promise<void> | void = () => {};
+	registerRelayCommand(
+		{
+			registerCommand: (
+				_name: string,
+				command: { handler: typeof handler },
+			) => {
+				handler = command.handler;
+			},
+		} as unknown as ExtensionAPI,
+		{ vault } as RelayController,
+	);
 	await handler("rename Default Personal", {
 		hasUI: true,
 		ui: { notify() {} },
