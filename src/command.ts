@@ -3,7 +3,7 @@ import type {
 	ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
 import type { RelayController } from "./pi.js";
-import { earliestFutureReset, predictedNext } from "./select.js";
+import { earliestFutureReset, selectProfile } from "./select.js";
 import type { Policy, RelayProfile } from "./types.js";
 import { dashboard } from "./ui.js";
 import { limitingRemaining } from "./usage.js";
@@ -83,11 +83,15 @@ async function handle(
 	}
 	if (command === "wait")
 		return waitCommand(accountArg, rest, context, controller);
+	if (command === "unpin") {
+		const next = await controller.unpin();
+		return output(context, `Unpinned; next account: ${next?.label ?? "none"}`);
+	}
 	if (!accountArg) throw new Error(`Account required for relay ${command}`);
 	const profile = await resolveAccount(controller, accountArg);
 	switch (command) {
 		case "use":
-			controller.pin(profile.id);
+			controller.pin(profile);
 			return output(context, `Pinned ${profile.label}`);
 		case "prioritize":
 			controller.prioritize(profile.id);
@@ -144,13 +148,22 @@ async function showStatus(
 ): Promise<void> {
 	const profiles = await controller.freshProfiles();
 	const state = await controller.vault.read();
-	const next = predictedNext(
+	const next = selectProfile(
 		profiles,
 		state.settings.policy,
+		controller.overrides(),
 		Date.now(),
+		new Set(),
 		state.settings.priorityOrder,
+	).profile;
+	output(
+		context,
+		dashboard(
+			state,
+			controller.pinnedId() ?? next?.id ?? controller.activeId(),
+			next?.id,
+		),
 	);
-	output(context, dashboard(state, controller.activeId(), next?.id));
 }
 
 async function waitCommand(

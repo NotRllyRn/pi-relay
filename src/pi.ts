@@ -311,9 +311,27 @@ export class RelayController {
 				: {}),
 		};
 	}
-	pin(id?: string): void {
-		this.pinnedProfileId = id;
-		this.updateStatus();
+	pin(profile?: RelayProfile): void {
+		this.pinnedProfileId = profile?.id;
+		this.updateStatus(profile);
+	}
+	async unpin(): Promise<RelayProfile | undefined> {
+		this.pinnedProfileId = undefined;
+		const profiles = await this.vault.listProfiles();
+		const state = await this.vault.read();
+		const next = selectProfile(
+			profiles,
+			state.settings.policy,
+			this.overrides(),
+			Date.now(),
+			new Set(),
+			state.settings.priorityOrder,
+		).profile;
+		this.updateStatus(next);
+		return next;
+	}
+	pinnedId(): string | undefined {
+		return this.pinnedProfileId;
 	}
 	prioritize(id?: string): void {
 		this.prioritizedProfileId = id;
@@ -368,7 +386,7 @@ export class RelayController {
 	}
 
 	overrideWait(profile: RelayProfile): void {
-		this.pin(profile.id);
+		this.pin(profile);
 		if (
 			this.pending ||
 			this.restoredCheckpoint?.phase === "paused" ||
@@ -387,6 +405,7 @@ export class RelayController {
 			this.activeProfileId = undefined;
 			this.activeLabel = undefined;
 		}
+		this.updateStatus();
 	}
 
 	private dependencies(): RelayStreamDependencies {
