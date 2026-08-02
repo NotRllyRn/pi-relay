@@ -40,7 +40,12 @@ async function handle(
 	controller: RelayController,
 ): Promise<void> {
 	const [command, accountArg, ...rest] = input.split(/\s+/).filter(Boolean);
-	if (!command || command === "status") return showStatus(context, controller);
+	if (!command) {
+		await showStatus(context, controller);
+		if (context.hasUI) await showMenu(context, controller);
+		return;
+	}
+	if (command === "status") return showStatus(context, controller);
 	if (command === "add") {
 		if (!context.hasUI)
 			throw new Error("Run /login openai-codex in interactive mode");
@@ -128,6 +133,7 @@ async function handle(
 			});
 			return output(context, `Renamed ${profile.label} to ${label}`);
 		}
+		case "delete":
 		case "remove":
 			if (
 				context.mode === "tui" &&
@@ -140,6 +146,90 @@ async function handle(
 		default:
 			throw new Error(`Unknown Relay command: ${command}`);
 	}
+}
+
+async function showMenu(
+	context: ExtensionCommandContext,
+	controller: RelayController,
+): Promise<void> {
+	const actions = [
+		"Add account",
+		"Use / pin account",
+		...(controller.pinnedId() ? ["Unpin account"] : []),
+		"Rename account",
+		"Delete account",
+		"Enable / disable account",
+		"Prioritize account",
+		"Skip account until reset",
+		"Refresh usage",
+		"Change policy",
+		"Quota Wait",
+		"Show log path",
+	];
+	const action = await context.ui.select("Pi Relay", actions);
+	if (!action) return;
+	if (action === "Add account") return handle("add", context, controller);
+	if (action === "Unpin account") return handle("unpin", context, controller);
+	if (action === "Show log path") return handle("logs", context, controller);
+	if (action === "Change policy") {
+		const policy = await context.ui.select("Relay policy", [...POLICIES]);
+		if (policy) await handle(`policy ${policy}`, context, controller);
+		return;
+	}
+	if (action === "Quota Wait") return waitMenu(context, controller);
+	if (action === "Refresh usage") {
+		const profile = await selectAccount(context, controller, "Refresh usage", true);
+		if (profile !== undefined) await handle(`refresh ${profile?.id ?? "all"}`, context, controller);
+		return;
+	}
+	const profile = await selectAccount(context, controller, action);
+	if (!profile) return;
+	switch (action) {
+		case "Use / pin account":
+			return handle(`use ${profile.id}`, context, controller);
+		case "Rename account": {
+			const label = await context.ui.input("New account name", profile.label);
+			if (label?.trim()) await handle(`rename ${profile.id} ${label.trim()}`, context, controller);
+			return;
+		}
+		case "Delete account":
+			return handle(`delete ${profile.id}`, context, controller);
+		case "Enable / disable account":
+			return handle(`${profile.enabled ? "disable" : "enable"} ${profile.id}`, context, controller);
+		case "Prioritize account":
+			return handle(`prioritize ${profile.id}`, context, controller);
+		case "Skip account until reset":
+			return handle(`skip ${profile.id}`, context, controller);
+	}
+}
+
+async function selectAccount(
+	context: ExtensionCommandContext,
+	controller: RelayController,
+	title: string,
+	includeAll = false,
+): Promise<RelayProfile | null | undefined> {
+	const profiles = await controller.vault.listProfiles();
+	const choices = [
+		...(includeAll ? ["All accounts"] : []),
+		...profiles.map((profile) => `${profile.label} · ${profile.id.slice(0, 8)}`),
+	];
+	if (!choices.length) throw new Error("No Relay accounts; choose Add account first");
+	const choice = await context.ui.select(title, choices);
+	if (!choice) return undefined;
+	if (choice === "All accounts") return null;
+	return profiles[choices.indexOf(choice) - (includeAll ? 1 : 0)];
+}
+
+async function waitMenu(
+	context: ExtensionCommandContext,
+	controller: RelayController,
+): Promise<void> {
+	const action = await context.ui.select("Quota Wait", ["Status", "Pause", "Resume", "Cancel", "Override account"]);
+	if (!action) return;
+	if (action !== "Override account") return waitCommand(action.toLowerCase(), [], context, controller);
+	const profile = await selectAccount(context, controller, "Override with account");
+	if (profile) await waitCommand("override", [profile.id], context, controller);
 }
 
 async function showStatus(
