@@ -10,27 +10,15 @@ pi install git:github.com/NotRllyRn/pi-relay
 
 Restart Pi.
 
-## Add accounts
+## Manage Relay
 
 ```text
-/relay add
+/relay
 ```
 
-Run the prepared `/login openai-codex` command, then enter a label, access token, and refresh token. Secret fields are masked.
+This shows account status and opens a menu for adding, renaming, deleting, enabling, selecting, or unpinning accounts; refreshing usage; changing policy; and controlling Quota Wait.
 
-## Commands
-
-| Command | Action |
-| --- | --- |
-| `/relay` | Accounts and usage |
-| `/relay use <account>` | Use at next safe request |
-| `/relay rename <account> <name>` | Rename an account, including the imported Default profile |
-| `/relay prioritize <account>` | Prefer next |
-| `/relay skip <account>` | Skip until reset |
-| `/relay disable\|enable <account>` | Exclude or restore |
-| `/relay refresh [all]` | Refresh usage |
-| `/relay policy <name>` | Select policy |
-| `/relay wait <action>` | Control Quota Wait |
+Adding an account prepares `/login openai-codex`. Enter a label, access token, and refresh token there. Secret fields are masked.
 
 ## Behavior
 

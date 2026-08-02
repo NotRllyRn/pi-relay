@@ -161,10 +161,10 @@ export class RelayController {
 			state?.continuationPending
 		) {
 			this.wait.pause();
-			context.ui.setStatus("pi-relay", "Relay: PAUSED | /relay wait resume");
+			context.ui.setStatus("pi-relay", "Relay: PAUSED | open /relay");
 			context.ui.setWidget("pi-relay", [
 				"PI RELAY PAUSED",
-				"Saved interrupted task: /relay wait resume",
+				"Saved interrupted task: open /relay to resume",
 			]);
 		}
 	}
@@ -221,7 +221,7 @@ export class RelayController {
 		if (this.wait.state !== "waiting") return;
 		this.wait.pause();
 		this.context?.ui.notify(
-			"Saved Relay task paused; use /relay wait resume",
+			"Saved Relay task paused; open /relay to resume",
 			"warning",
 		);
 	}
@@ -608,14 +608,14 @@ export class RelayController {
 			this.context?.ui.setWidget("pi-relay", [
 				"QUOTA WAIT",
 				`Resume: ${wake.profile.label} ${formatRelative(wake.at)}`,
-				"Controls: /relay wait cancel | pause | resume",
+				"Controls: open /relay",
 			]);
 			this.context?.ui.notify("Relay entered Quota Wait", "warning");
 		} else if (state === "paused") {
 			this.checkpoint("paused", !!this.pending, this.pending?.requestId);
 			this.context?.ui.setStatus(
 				"pi-relay",
-				"Relay: PAUSED | /relay wait resume",
+				"Relay: PAUSED | open /relay",
 			);
 			this.context?.ui.setWidget("pi-relay", undefined);
 		} else {
