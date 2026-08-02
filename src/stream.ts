@@ -23,6 +23,7 @@ export type RelayStreamDependencies = {
   success(profile: RelayProfile): Promise<void>;
   selected?(profile: RelayProfile, previous?: RelayProfile): void;
   continuation?(details: { requestId: string; profile: RelayProfile; failure: Failure }): void;
+  wait?(profiles: RelayProfile[], signal?: AbortSignal): Promise<boolean>;
 };
 
 export const isMeaningful = (event: AssistantMessageEvent): boolean =>
@@ -53,7 +54,10 @@ async function run(
       const settings = await dependencies.settings();
       const selection = selectProfile(profiles, settings.policy, dependencies.overrides(), Date.now(), attempted, settings.priorityOrder);
       const profile = selection.profile;
-      if (!profile) break;
+      if (!profile) {
+        if (dependencies.wait && await dependencies.wait(profiles, options.signal)) { attempted.clear(); continue; }
+        break;
+      }
       attempted.add(profile.id);
       dependencies.selected?.(profile, previous);
       previous = profile;
