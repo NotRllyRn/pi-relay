@@ -86,7 +86,7 @@ test("invalid grant marks profile as needing login", async () => {
 	assert.equal((await vault.getProfile(profile.id))?.needsLogin, true);
 });
 
-test("detects duplicate accounts and classifies strict failures", async () => {
+test("detects only duplicate credentials, not shared account ids", async () => {
 	const { profile } = await setup();
 	profile.credential.accountId = "same";
 	assert.equal(
@@ -95,6 +95,14 @@ test("detects duplicate accounts and classifies strict failures", async () => {
 			refresh: "other",
 			expires: 1,
 			accountId: "same",
+		}),
+		undefined,
+	);
+	assert.equal(
+		duplicateProfile([profile], {
+			access: "other-access",
+			refresh: profile.credential.refresh,
+			expires: 1,
 		})?.id,
 		profile.id,
 	);

@@ -24,6 +24,7 @@ Run the prepared `/login openai-codex` command, then enter a label, access token
 | --- | --- |
 | `/relay` | Accounts and usage |
 | `/relay use <account>` | Use at next safe request |
+| `/relay rename <account> <name>` | Rename an account, including the imported Default profile |
 | `/relay prioritize <account>` | Prefer next |
 | `/relay skip <account>` | Skip until reset |
 | `/relay disable\|enable <account>` | Exclude or restore |

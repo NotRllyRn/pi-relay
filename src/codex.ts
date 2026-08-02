@@ -40,11 +40,6 @@ export const duplicateProfile = (
 ): RelayProfile | undefined =>
 	profiles.find(
 		(profile) =>
-			credential.accountId &&
-			profile.credential.accountId === credential.accountId,
-	) ??
-	profiles.find(
-		(profile) =>
 			fingerprint(profile.credential.refresh) ===
 			fingerprint(credential.refresh),
 	);

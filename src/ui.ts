@@ -67,5 +67,6 @@ export const dashboard = (
 		`Pool: ${formatPercent(pool.primary)} | ${formatPercent(pool.secondary)} | effective ${formatPercent(pool.effective)} | ${pool.measured}/${pool.total} fresh`,
 		`Policy: ${state.settings.policy}`,
 		`Quota Wait: ${state.settings.quotaWait ? "on" : "off"}`,
+		"Manage: /relay add | /relay rename <account> <name>",
 	].join("\n");
 };
