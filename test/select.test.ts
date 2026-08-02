@@ -3,44 +3,105 @@ import test from "node:test";
 import { isEligible, selectProfile } from "../src/select.js";
 import type { RelayProfile } from "../src/types.js";
 
-const profile = (id: string, used = 50, resetAt = 1000, order = 0): RelayProfile => ({
-  id, provider: "openai-codex", label: id, credential: { access: "a", refresh: "r", expires: 10000 }, generation: 0,
-  enabled: true, order, createdAt: 0, updatedAt: 0,
-  quota: { fetchedAt: 0, primary: { usedPercent: used, resetAt }, secondary: { usedPercent: used, resetAt: resetAt + 100 } },
+const profile = (
+	id: string,
+	used = 50,
+	resetAt = 1000,
+	order = 0,
+): RelayProfile => ({
+	id,
+	provider: "openai-codex",
+	label: id,
+	credential: { access: "a", refresh: "r", expires: 10000 },
+	generation: 0,
+	enabled: true,
+	order,
+	createdAt: 0,
+	updatedAt: 0,
+	quota: {
+		fetchedAt: 0,
+		primary: { usedPercent: used, resetAt },
+		secondary: { usedPercent: used, resetAt: resetAt + 100 },
+	},
 });
 
 test("filters unavailable states and expires temporary exclusions", () => {
-  const attempted = new Set(["attempted"]);
-  for (const value of [
-    { ...profile("disabled"), enabled: false }, { ...profile("login"), needsLogin: true },
-    { ...profile("skip"), skippedUntil: 500 }, { ...profile("cool"), cooldownUntil: 500 },
-    { ...profile("exhaust"), exhaustedUntil: 500 }, profile("attempted"), profile("zero", 100),
-  ]) assert.equal(isEligible(value, 100, attempted), false, value.id);
-  assert.equal(isEligible({ ...profile("old"), skippedUntil: 50 }, 100), true);
+	const attempted = new Set(["attempted"]);
+	for (const value of [
+		{ ...profile("disabled"), enabled: false },
+		{ ...profile("login"), needsLogin: true },
+		{ ...profile("skip"), skippedUntil: 500 },
+		{ ...profile("cool"), cooldownUntil: 500 },
+		{ ...profile("exhaust"), exhaustedUntil: 500 },
+		profile("attempted"),
+		profile("zero", 100),
+	])
+		assert.equal(isEligible(value, 100, attempted), false, value.id);
+	assert.equal(isEligible({ ...profile("old"), skippedUntil: 50 }, 100), true);
 });
 
 test("smart reset chooses earliest limiting reset and stable order", () => {
-  const a = profile("a", 20, 500, 1), b = profile("b", 20, 300, 2);
-  assert.equal(selectProfile([a, b], "smart-reset", {}, 0).profile?.id, "b");
-  assert.equal(selectProfile([profile("later", 20, 500, 0), profile("earlier", 95, 300, 1)], "smart-reset", {}, 0).profile?.id, "earlier");
+	const a = profile("a", 20, 500, 1),
+		b = profile("b", 20, 300, 2);
+	assert.equal(selectProfile([a, b], "smart-reset", {}, 0).profile?.id, "b");
+	assert.equal(
+		selectProfile(
+			[profile("later", 20, 500, 0), profile("earlier", 95, 300, 1)],
+			"smart-reset",
+			{},
+			0,
+		).profile?.id,
+		"earlier",
+	);
 });
 
 test("most available and priority order are exact", () => {
-  const a = profile("a", 60, 300), b = profile("b", 20, 500);
-  assert.equal(selectProfile([a, b], "most-available", {}, 0).profile?.id, "b");
-  assert.equal(selectProfile([a, b], "priority-order", {}, 0, new Set(), ["b", "a"]).profile?.id, "b");
+	const a = profile("a", 60, 300),
+		b = profile("b", 20, 500);
+	assert.equal(selectProfile([a, b], "most-available", {}, 0).profile?.id, "b");
+	assert.equal(
+		selectProfile([a, b], "priority-order", {}, 0, new Set(), ["b", "a"])
+			.profile?.id,
+		"b",
+	);
 });
 
 test("known quota ranks before unknown and overrides take precedence", () => {
-  const a = profile("a"), { quota: _quota, ...unknown } = profile("unknown");
-  assert.equal(selectProfile([unknown, a], "smart-reset", {}, 0).profile?.id, "a");
-  assert.equal(selectProfile([a, unknown], "smart-reset", { pinnedProfileId: "unknown" }, 0).source, "pin");
-  assert.deepEqual(selectProfile([a, unknown], "smart-reset", { prioritizedProfileId: "unknown" }, 0), { profile: unknown, source: "priority", consumePriority: true });
+	const a = profile("a"),
+		{ quota: _quota, ...unknown } = profile("unknown");
+	assert.equal(
+		selectProfile([unknown, a], "smart-reset", {}, 0).profile?.id,
+		"a",
+	);
+	assert.equal(
+		selectProfile(
+			[a, unknown],
+			"smart-reset",
+			{ pinnedProfileId: "unknown" },
+			0,
+		).source,
+		"pin",
+	);
+	assert.deepEqual(
+		selectProfile(
+			[a, unknown],
+			"smart-reset",
+			{ prioritizedProfileId: "unknown" },
+			0,
+		),
+		{ profile: unknown, source: "priority", consumePriority: true },
+	);
 });
 
 test("clears a permanently ineligible pin", () => {
-  const pinned = { ...profile("a"), enabled: false }, b = profile("b");
-  const result = selectProfile([pinned, b], "smart-reset", { pinnedProfileId: "a" }, 0);
-  assert.equal(result.profile?.id, "b");
-  assert.equal(result.clearPin, true);
+	const pinned = { ...profile("a"), enabled: false },
+		b = profile("b");
+	const result = selectProfile(
+		[pinned, b],
+		"smart-reset",
+		{ pinnedProfileId: "a" },
+		0,
+	);
+	assert.equal(result.profile?.id, "b");
+	assert.equal(result.clearPin, true);
 });

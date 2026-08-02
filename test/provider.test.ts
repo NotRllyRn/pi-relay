@@ -10,12 +10,30 @@ import { RelayController } from "../src/pi.js";
 import { Vault } from "../src/vault.js";
 
 test("provider preserves Codex identity and model catalog", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "relay-provider-"));
-  const vault = new Vault(join(directory, "state.json"));
-  await vault.change((state) => { state.migratedNativeAuth = true; });
-  const pi = { appendEntry() {}, sendMessage() {} } as unknown as ExtensionAPI;
-  const provider = (await RelayController.create(pi, vault, new RelayLog(join(directory, "relay.log")))).provider();
-  assert.equal(provider.id, "openai-codex");
-  assert.deepEqual(provider.getModels().map((model) => model.id), openaiCodexProvider().getModels().map((model) => model.id));
-  assert.equal(await provider.auth.apiKey?.check?.({ ctx: { env: async () => undefined, fileExists: async () => false } }), undefined);
+	const directory = await mkdtemp(join(tmpdir(), "relay-provider-"));
+	const vault = new Vault(join(directory, "state.json"));
+	await vault.change((state) => {
+		state.migratedNativeAuth = true;
+	});
+	const pi = { appendEntry() {}, sendMessage() {} } as unknown as ExtensionAPI;
+	const provider = (
+		await RelayController.create(
+			pi,
+			vault,
+			new RelayLog(join(directory, "relay.log")),
+		)
+	).provider();
+	assert.equal(provider.id, "openai-codex");
+	assert.deepEqual(
+		provider.getModels().map((model) => model.id),
+		openaiCodexProvider()
+			.getModels()
+			.map((model) => model.id),
+	);
+	assert.equal(
+		await provider.auth.apiKey?.check?.({
+			ctx: { env: async () => undefined, fileExists: async () => false },
+		}),
+		undefined,
+	);
 });
