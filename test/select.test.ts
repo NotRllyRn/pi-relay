@@ -40,18 +40,25 @@ test("filters unavailable states and expires temporary exclusions", () => {
 	assert.equal(isEligible({ ...profile("old"), skippedUntil: 50 }, 100), true);
 });
 
-test("smart reset chooses earliest limiting reset and stable order", () => {
-	const a = profile("a", 20, 500, 1),
-		b = profile("b", 20, 300, 2);
-	assert.equal(selectProfile([a, b], "smart-reset", {}, 0).profile?.id, "b");
+test("smart reset spends the long window expiring soonest", () => {
+	const soonerLong = profile("sooner-long", 20, 500, 1),
+		soonerShort = profile("sooner-short", 20, 100, 2);
+	soonerLong.quota!.secondary!.resetAt = 300;
+	soonerShort.quota!.secondary!.resetAt = 400;
 	assert.equal(
-		selectProfile(
-			[profile("later", 20, 500, 0), profile("earlier", 95, 300, 1)],
-			"smart-reset",
-			{},
-			0,
-		).profile?.id,
-		"earlier",
+		selectProfile([soonerShort, soonerLong], "smart-reset", {}, 0).profile?.id,
+		"sooner-long",
+	);
+
+	const polina = profile("polina", 0, 180),
+		alejandro = profile("alejandro", 71, 75),
+		arina = profile("arina", 15, 260);
+	polina.quota!.secondary = { usedPercent: 73, resetAt: 1180 };
+	alejandro.quota!.secondary = { usedPercent: 75, resetAt: 981 };
+	arina.quota!.secondary = { usedPercent: 2, resetAt: 10_080 };
+	assert.equal(
+		selectProfile([polina, alejandro, arina], "smart-reset", {}, 0).profile?.id,
+		"alejandro",
 	);
 });
 

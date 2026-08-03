@@ -118,15 +118,19 @@ const smartComparator = (a: RelayProfile, b: RelayProfile) =>
 	compare(
 		[
 			known(a),
-			limitingReset(a),
-			limitingRemaining(a.quota) ?? 101,
+			a.quota?.secondary?.resetAt ?? Number.MAX_SAFE_INTEGER,
+			a.quota?.primary?.resetAt ?? Number.MAX_SAFE_INTEGER,
+			-(remaining(a.quota?.secondary) ?? -1),
+			-(remaining(a.quota?.primary) ?? -1),
 			a.lastUsedAt ?? 0,
 			a.order,
 		],
 		[
 			known(b),
-			limitingReset(b),
-			limitingRemaining(b.quota) ?? 101,
+			b.quota?.secondary?.resetAt ?? Number.MAX_SAFE_INTEGER,
+			b.quota?.primary?.resetAt ?? Number.MAX_SAFE_INTEGER,
+			-(remaining(b.quota?.secondary) ?? -1),
+			-(remaining(b.quota?.primary) ?? -1),
 			b.lastUsedAt ?? 0,
 			b.order,
 		],
