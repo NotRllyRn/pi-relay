@@ -50,6 +50,21 @@ test("concurrent changes preserve profiles", async () => {
 	assert.equal((await vault.listProfiles()).length, 8);
 });
 
+test("serializes refresh work across Vault instances", async () => {
+	const { path, vault } = await setup();
+	const profile = await vault.add({ label: "One", credential: credential() });
+	const other = new Vault(path);
+	let active = 0;
+	let maxActive = 0;
+	const work = (instance: Vault) => instance.withRefreshLock(profile.id, async () => {
+		maxActive = Math.max(maxActive, ++active);
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		active--;
+	});
+	await Promise.all([work(vault), work(other)]);
+	assert.equal(maxActive, 1);
+});
+
 test("recovers a stale lock", async () => {
 	const { vault } = await setup();
 	await mkdir(vault.lockPath, { recursive: true });
@@ -70,7 +85,12 @@ test("generation compare-and-swap rejects stale refresh", async () => {
 		await vault.commitRefresh(profile.id, 0, credential("stale")),
 		false,
 	);
+	assert.equal(
+		await vault.updateGeneration(profile.id, 0, (value) => { value.needsLogin = true; }),
+		false,
+	);
 	assert.equal((await vault.getProfile(profile.id))?.credential.access, "new");
+	assert.equal((await vault.getProfile(profile.id))?.needsLogin, undefined);
 });
 
 test("quarantines corrupt files and enforces modes", async () => {

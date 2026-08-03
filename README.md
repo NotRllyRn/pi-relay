@@ -28,6 +28,8 @@ Before output, quota failures retry the same request on another account. After p
 
 Tokens are stored in `~/.pi/agent/pi-relay/state.json` with owner-only permissions. They are not encrypted. Anyone who can read files as your OS user can read them.
 
+Multiple Pi processes may share the vault: state writes, token refreshes, and log rotation are coordinated with filesystem locks.
+
 Users are responsible for complying with provider account and usage terms.
 
 ## Development

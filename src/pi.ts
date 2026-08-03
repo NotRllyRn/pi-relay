@@ -486,10 +486,12 @@ export class RelayController {
 				value.cooldownUntil = failure.retryAt ?? Date.now() + 30_000;
 			});
 		} else if (failure.kind === "auth") {
-			await this.vault.update(profile.id, (value) => {
-				value.needsLogin = true;
-			});
-			this.context?.ui.notify(`${profile.label} needs login`, "warning");
+			const marked = await this.vault.updateGeneration(
+				profile.id,
+				profile.generation,
+				(value) => { value.needsLogin = true; },
+			);
+			if (marked) this.context?.ui.notify(`${profile.label} needs login`, "warning");
 		}
 		await this.log.write("failure", {
 			profile: fingerprint(profile.id),

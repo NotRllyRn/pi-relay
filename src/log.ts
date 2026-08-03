@@ -1,6 +1,7 @@
 import { chmod, mkdir, rename, stat } from "node:fs/promises";
 import { appendFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { withFileLock } from "./file-lock.js";
 
 const MAX_BYTES = 1024 * 1024;
 const SECRET_KEYS =
@@ -30,17 +31,19 @@ export class RelayLog {
 		if (this.failed) return;
 		try {
 			await mkdir(dirname(this.path), { recursive: true, mode: 0o700 });
-			if (
-				((await stat(this.path).catch(() => undefined))?.size ?? 0) >=
-				this.maxBytes
-			)
-				await this.rotate();
-			await appendFile(
-				this.path,
-				`${JSON.stringify(redact({ ts: new Date().toISOString(), event, ...data }))}\n`,
-				{ mode: 0o600 },
-			);
-			await chmod(this.path, 0o600);
+			await withFileLock(`${this.path}.lock`, async () => {
+				if (
+					((await stat(this.path).catch(() => undefined))?.size ?? 0) >=
+					this.maxBytes
+				)
+					await this.rotate();
+				await appendFile(
+					this.path,
+					`${JSON.stringify(redact({ ts: new Date().toISOString(), event, ...data }))}\n`,
+					{ mode: 0o600 },
+				);
+				await chmod(this.path, 0o600);
+			});
 		} catch {
 			this.failed = true;
 		}

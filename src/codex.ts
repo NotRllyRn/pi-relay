@@ -67,47 +67,69 @@ export async function ensureValidToken(
 	now = Date.now(),
 	refresh: RefreshToken = refreshCodex,
 ): Promise<RelayProfile["credential"]> {
-	if (profile.credential.expires > now + REFRESH_AHEAD_MS)
-		return profile.credential;
-	const pending = refreshes.get(profile.id);
-	if (pending) return pending;
-	const promise = (async () => {
-		try {
-			const result = await refresh(
-				{ type: "oauth", ...profile.credential },
-				signal,
-			);
-			const metadata = jwtMetadata(result.access);
-			const credential = {
-				access: result.access,
-				refresh: result.refresh,
-				expires: result.expires,
-				...(metadata.accountId || profile.credential.accountId
-					? { accountId: metadata.accountId ?? profile.credential.accountId }
-					: {}),
-			};
-			return (await vault.commitRefresh(
-				profile.id,
-				profile.generation,
-				credential,
-			))
-				? credential
-				: ((await vault.getProfile(profile.id))?.credential ?? credential);
-		} catch (error) {
-			if (/invalid_grant|revoked|unauthorized/i.test(errorMessage(error)))
-				await vault.update(profile.id, (value) => {
-					value.needsLogin = true;
-				});
-			throw new Error(sanitizeError(error));
-		}
-	})();
-	refreshes.set(profile.id, promise);
+	const latest = await vault.getProfile(profile.id);
+	if (!latest) throw new Error("Relay account no longer exists");
+	syncProfile(profile, latest);
+	if (latest.credential.expires > now + REFRESH_AHEAD_MS)
+		return latest.credential;
+	const key = `${vault.path}:${profile.id}`;
+	const pending = refreshes.get(key);
+	if (pending) {
+		const credential = await pending;
+		const current = await vault.getProfile(profile.id);
+		if (current) syncProfile(profile, current);
+		return credential;
+	}
+	const promise = vault.withRefreshLock(
+		profile.id,
+		async () => {
+			const current = await vault.getProfile(profile.id);
+			if (!current) throw new Error("Relay account no longer exists");
+			syncProfile(profile, current);
+			if (current.credential.expires > now + REFRESH_AHEAD_MS)
+				return current.credential;
+			try {
+				const result = await refresh(
+					{ type: "oauth", ...current.credential },
+					signal,
+				);
+				const metadata = jwtMetadata(result.access);
+				const credential = {
+					access: result.access,
+					refresh: result.refresh,
+					expires: result.expires,
+					...(metadata.accountId || current.credential.accountId
+						? { accountId: metadata.accountId ?? current.credential.accountId }
+						: {}),
+				};
+				await vault.commitRefresh(profile.id, current.generation, credential);
+				const saved = await vault.getProfile(profile.id);
+				if (saved) syncProfile(profile, saved);
+				return saved?.credential ?? credential;
+			} catch (error) {
+				if (/invalid_grant|revoked|unauthorized/i.test(errorMessage(error)))
+					await vault.updateGeneration(profile.id, current.generation, (value) => {
+						value.needsLogin = true;
+					});
+				throw new Error(sanitizeError(error));
+			}
+		},
+		signal,
+	);
+	refreshes.set(key, promise);
 	try {
 		return await promise;
 	} finally {
-		refreshes.delete(profile.id);
+		refreshes.delete(key);
 	}
 }
+
+const syncProfile = (target: RelayProfile, source: RelayProfile): void => {
+	target.credential = source.credential;
+	target.generation = source.generation;
+	if (source.needsLogin === undefined) delete target.needsLogin;
+	else target.needsLogin = source.needsLogin;
+};
 
 export const classifyFailure = (error: unknown): Failure => {
 	const message = errorMessage(error);

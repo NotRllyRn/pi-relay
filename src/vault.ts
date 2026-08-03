@@ -1,11 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rename, rm, stat } from "node:fs/promises";
+import { mkdir, open, readFile, rename } from "node:fs/promises";
 import { dirname } from "node:path";
+import { withFileLock } from "./file-lock.js";
 import type { RelayProfile, RelayState } from "./types.js";
 import { defaultState } from "./types.js";
-
-const LOCK_STALE_MS = 30_000;
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class Vault {
 	readonly lockPath: string;
@@ -91,41 +89,42 @@ export class Vault {
 		});
 	}
 
-	async commitRefresh(
+	async updateGeneration(
 		id: string,
 		generation: number,
-		credential: RelayProfile["credential"],
+		fn: (profile: RelayProfile) => void,
 	): Promise<boolean> {
 		return this.change((state) => {
 			const profile = state.profiles[id];
 			if (!profile || profile.generation !== generation) return false;
-			profile.credential = credential;
-			profile.generation++;
+			fn(profile);
 			profile.updatedAt = Date.now();
 			return true;
 		});
 	}
 
-	private async lock<T>(fn: () => Promise<T>): Promise<T> {
-		await mkdir(dirname(this.path), { recursive: true, mode: 0o700 });
-		for (;;) {
-			try {
-				await mkdir(this.lockPath);
-				break;
-			} catch (error) {
-				if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-				const lock = await stat(this.lockPath).catch(() => undefined);
-				if (!lock) continue;
-				if (Date.now() - lock.mtimeMs > LOCK_STALE_MS)
-					await rm(this.lockPath, { recursive: true, force: true });
-				else await sleep(20);
-			}
-		}
-		try {
-			return await fn();
-		} finally {
-			await rm(this.lockPath, { recursive: true, force: true });
-		}
+	async commitRefresh(
+		id: string,
+		generation: number,
+		credential: RelayProfile["credential"],
+	): Promise<boolean> {
+		return this.updateGeneration(id, generation, (profile) => {
+			profile.credential = credential;
+			profile.generation++;
+			delete profile.needsLogin;
+		});
+	}
+
+	withRefreshLock<T>(
+		id: string,
+		fn: () => Promise<T>,
+		signal?: AbortSignal,
+	): Promise<T> {
+		return withFileLock(`${this.path}.refresh-${id}.lock`, fn, signal);
+	}
+
+	private lock<T>(fn: () => Promise<T>): Promise<T> {
+		return withFileLock(this.lockPath, fn);
 	}
 
 	private async write(state: RelayState): Promise<void> {

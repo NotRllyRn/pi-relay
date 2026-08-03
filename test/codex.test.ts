@@ -69,11 +69,31 @@ test("deduplicates concurrent refresh and protects newer generation", async () =
 			expires: Date.now() + 999999,
 		};
 	};
+	const second = structuredClone(profile);
 	await Promise.all([
 		ensureValidToken(vault, profile, undefined, Date.now(), refresh),
-		ensureValidToken(vault, profile, undefined, Date.now(), refresh),
+		ensureValidToken(vault, second, undefined, Date.now(), refresh),
 	]);
 	assert.equal(calls, 1);
+	assert.equal(second.generation, 1);
+});
+
+test("uses a refresh committed by another process instead of stale credentials", async () => {
+	const { vault, profile } = await setup();
+	await vault.commitRefresh(profile.id, profile.generation, {
+		access: "new",
+		refresh: "new-refresh",
+		expires: Date.now() + 999_999,
+	});
+	let calls = 0;
+	const credential = await ensureValidToken(vault, profile, undefined, Date.now(), async () => {
+		calls++;
+		throw new Error("invalid_grant");
+	});
+	assert.equal(calls, 0);
+	assert.equal(credential.refresh, "new-refresh");
+	assert.equal(profile.generation, 1);
+	assert.equal((await vault.getProfile(profile.id))?.needsLogin, undefined);
 });
 
 test("invalid grant marks profile as needing login", async () => {
