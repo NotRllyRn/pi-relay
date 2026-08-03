@@ -56,11 +56,12 @@ test("serializes refresh work across Vault instances", async () => {
 	const other = new Vault(path);
 	let active = 0;
 	let maxActive = 0;
-	const work = (instance: Vault) => instance.withRefreshLock(profile.id, async () => {
-		maxActive = Math.max(maxActive, ++active);
-		await new Promise((resolve) => setTimeout(resolve, 20));
-		active--;
-	});
+	const work = (instance: Vault) =>
+		instance.withRefreshLock(profile.id, async () => {
+			maxActive = Math.max(maxActive, ++active);
+			await new Promise((resolve) => setTimeout(resolve, 20));
+			active--;
+		});
 	await Promise.all([work(vault), work(other)]);
 	assert.equal(maxActive, 1);
 });
@@ -86,7 +87,9 @@ test("generation compare-and-swap rejects stale refresh", async () => {
 		false,
 	);
 	assert.equal(
-		await vault.updateGeneration(profile.id, 0, (value) => { value.needsLogin = true; }),
+		await vault.updateGeneration(profile.id, 0, (value) => {
+			value.needsLogin = true;
+		}),
 		false,
 	);
 	assert.equal((await vault.getProfile(profile.id))?.credential.access, "new");

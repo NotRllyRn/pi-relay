@@ -21,11 +21,18 @@ test("recursively redacts secret and conversation keys", () => {
 });
 
 test("serializes writes across logger instances", async () => {
-	const path = join(await mkdtemp(join(tmpdir(), "relay-log-concurrent-")), "relay.log");
+	const path = join(
+		await mkdtemp(join(tmpdir(), "relay-log-concurrent-")),
+		"relay.log",
+	);
 	const logs = [new RelayLog(path), new RelayLog(path)];
-	await Promise.all(logs.flatMap((log, process) =>
-		Array.from({ length: 10 }, (_, index) => log.write("line", { process, index })),
-	));
+	await Promise.all(
+		logs.flatMap((log, process) =>
+			Array.from({ length: 10 }, (_, index) =>
+				log.write("line", { process, index }),
+			),
+		),
+	);
 	assert.equal((await readFile(path, "utf8")).trim().split("\n").length, 20);
 });
 

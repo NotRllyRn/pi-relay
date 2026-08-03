@@ -489,9 +489,12 @@ export class RelayController {
 			const marked = await this.vault.updateGeneration(
 				profile.id,
 				profile.generation,
-				(value) => { value.needsLogin = true; },
+				(value) => {
+					value.needsLogin = true;
+				},
 			);
-			if (marked) this.context?.ui.notify(`${profile.label} needs login`, "warning");
+			if (marked)
+				this.context?.ui.notify(`${profile.label} needs login`, "warning");
 		}
 		await this.log.write("failure", {
 			profile: fingerprint(profile.id),

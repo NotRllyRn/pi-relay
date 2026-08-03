@@ -86,10 +86,16 @@ test("uses a refresh committed by another process instead of stale credentials",
 		expires: Date.now() + 999_999,
 	});
 	let calls = 0;
-	const credential = await ensureValidToken(vault, profile, undefined, Date.now(), async () => {
-		calls++;
-		throw new Error("invalid_grant");
-	});
+	const credential = await ensureValidToken(
+		vault,
+		profile,
+		undefined,
+		Date.now(),
+		async () => {
+			calls++;
+			throw new Error("invalid_grant");
+		},
+	);
 	assert.equal(calls, 0);
 	assert.equal(credential.refresh, "new-refresh");
 	assert.equal(profile.generation, 1);

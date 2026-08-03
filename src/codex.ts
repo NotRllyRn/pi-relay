@@ -108,9 +108,13 @@ export async function ensureValidToken(
 				return saved?.credential ?? credential;
 			} catch (error) {
 				if (/invalid_grant|revoked|unauthorized/i.test(errorMessage(error)))
-					await vault.updateGeneration(profile.id, current.generation, (value) => {
-						value.needsLogin = true;
-					});
+					await vault.updateGeneration(
+						profile.id,
+						current.generation,
+						(value) => {
+							value.needsLogin = true;
+						},
+					);
 				throw new Error(sanitizeError(error));
 			}
 		},
