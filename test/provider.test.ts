@@ -23,6 +23,11 @@ test("pin and unpin update the displayed account immediately", async () => {
 		label: "Other",
 		credential: { access: "b", refresh: "r2", expires: 1 },
 	});
+	other.quota = {
+		fetchedAt: Date.now(),
+		primary: { usedPercent: 15, resetAt: Date.now() + 260 * 60_000 },
+		secondary: { usedPercent: 2, resetAt: Date.now() + 7 * 86_400_000 },
+	};
 	let status = "";
 	const pi = { appendEntry() {}, sendMessage() {} } as unknown as ExtensionAPI;
 	const controller = await RelayController.create(
@@ -39,7 +44,7 @@ test("pin and unpin update the displayed account immediately", async () => {
 		},
 	} as never);
 	controller.pin(other);
-	assert.equal(status, "Relay: Other | pinned");
+	assert.equal(status, "Relay: Other | 85% 4h20m / 98% 7d left | pinned");
 	assert.equal((await controller.unpin())?.label, "Default");
 	assert.equal(status, "Relay: Default");
 });

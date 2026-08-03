@@ -22,7 +22,7 @@ Adding an account prepares `/login openai-codex`. Enter a label, access token, a
 
 ## Behavior
 
-Before output, quota failures retry the same request on another account. After partial output, Pi Relay continues in the same session with a hidden follow-up. If every account is exhausted, Quota Wait resumes after the earliest reset unless cancelled or paused. Codex is the only supported provider in this release.
+The footer shows the active account's short- and long-window quota remaining and reset countdowns. Before output, quota failures retry the same request on another account. After partial output, Pi Relay continues in the same session with a hidden follow-up. If every account is exhausted, Quota Wait resumes after the earliest reset unless cancelled or paused. Codex is the only supported provider in this release.
 
 ## Data
 

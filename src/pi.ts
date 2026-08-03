@@ -26,6 +26,7 @@ import {
 } from "./select.js";
 import { streamRelay, type RelayStreamDependencies } from "./stream.js";
 import type { Failure, RelayProfile, SessionRelayState } from "./types.js";
+import { compactUsage } from "./ui.js";
 import { fetchUsage, isFresh, limitingRemaining, UsageError } from "./usage.js";
 import type { Vault } from "./vault.js";
 import { WaitController } from "./wait.js";
@@ -48,6 +49,8 @@ export class RelayController {
 	private prioritizedProfileId: string | undefined;
 	private activeProfileId: string | undefined;
 	private activeLabel: string | undefined;
+	private displayedProfileId: string | undefined;
+	private statusTimer: ReturnType<typeof setInterval> | undefined;
 	private pending: Pending | undefined;
 	private restoredCheckpoint: SessionRelayState | undefined;
 	private switches = 0;
@@ -135,9 +138,14 @@ export class RelayController {
 	attachContext(context: ExtensionContext): void {
 		this.context = context;
 		this.updateStatus();
+		clearInterval(this.statusTimer);
+		this.statusTimer = setInterval(() => void this.syncStatus(), 60_000);
+		this.statusTimer.unref();
 	}
 	detachContext(): void {
 		if (this.wait.state === "waiting") this.wait.pause();
+		clearInterval(this.statusTimer);
+		this.statusTimer = undefined;
 		this.context?.ui.setStatus("pi-relay", undefined);
 		this.context?.ui.setWidget("pi-relay", undefined);
 		this.context = undefined;
@@ -276,7 +284,7 @@ export class RelayController {
 		if (!current) return;
 		const credential = await ensureValidToken(this.vault, current, signal);
 		const quota = await fetchUsage(credential, signal);
-		await this.vault.update(profile.id, (value) => {
+		const updated = await this.vault.update(profile.id, (value) => {
 			value.quota = quota;
 			value.needsLogin = false;
 			if (limitingRemaining(quota) === 0)
@@ -285,6 +293,7 @@ export class RelayController {
 			else if ((value.exhaustedUntil ?? 0) <= Date.now())
 				delete value.exhaustedUntil;
 		});
+		if (updated?.id === this.displayedProfileId) this.updateStatus(updated);
 		await this.log.write("usage-result", {
 			profile: fingerprint(profile.id),
 			remaining: limitingRemaining(quota),
@@ -405,6 +414,7 @@ export class RelayController {
 			this.activeProfileId = undefined;
 			this.activeLabel = undefined;
 		}
+		if (this.displayedProfileId === id) this.displayedProfileId = undefined;
 		this.updateStatus();
 	}
 
@@ -626,11 +636,21 @@ export class RelayController {
 		}
 	}
 
+	private async syncStatus(): Promise<void> {
+		if (this.wait.state !== "idle") return;
+		const profile = this.displayedProfileId
+			? await this.vault.getProfile(this.displayedProfileId)
+			: undefined;
+		this.updateStatus(profile);
+	}
+
 	private updateStatus(profile?: RelayProfile): void {
+		if (profile) this.displayedProfileId = profile.id;
 		const label = profile?.label ?? this.activeLabel ?? "no account";
+		const usage = profile && compactUsage(profile);
 		this.context?.ui.setStatus(
 			"pi-relay",
-			`Relay: ${label}${this.pinnedProfileId ? " | pinned" : ""}`,
+			`Relay: ${label}${usage ? ` | ${usage}` : ""}${this.pinnedProfileId ? " | pinned" : ""}`,
 		);
 	}
 }

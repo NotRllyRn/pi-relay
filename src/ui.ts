@@ -19,6 +19,11 @@ export const formatReset = (at?: number, now = Date.now()) => {
 			: `${minutes}m`;
 };
 
+export const compactUsage = (profile: RelayProfile, now = Date.now()) =>
+	profile.quota?.primary || profile.quota?.secondary
+		? `${formatPercent(remaining(profile.quota?.primary))} ${formatReset(profile.quota?.primary?.resetAt, now)} / ${formatPercent(remaining(profile.quota?.secondary))} ${formatReset(profile.quota?.secondary?.resetAt, now)} left`
+		: undefined;
+
 export const profileStatus = (
 	profile: RelayProfile,
 	activeId?: string,
