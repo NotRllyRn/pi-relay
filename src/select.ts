@@ -4,10 +4,11 @@ import { limitingRemaining, remaining } from "./usage.js";
 export type SelectionOverrides = {
 	pinnedProfileId?: string;
 	prioritizedProfileId?: string;
+	activeProfileId?: string;
 };
 export type Selection = {
 	profile?: RelayProfile;
-	source?: "pin" | "priority" | Policy;
+	source?: "pin" | "priority" | "active" | Policy;
 	clearPin?: boolean;
 	consumePriority?: boolean;
 };
@@ -17,15 +18,9 @@ export const isEligible = (
 	now = Date.now(),
 	attempted: ReadonlySet<string> = new Set(),
 ): boolean =>
-	profile.enabled &&
-	!profile.needsLogin &&
-	!attempted.has(profile.id) &&
-	!future(profile.skippedUntil, now) &&
-	!future(profile.cooldownUntil, now) &&
+	isRunnable(profile, now, attempted) &&
 	!future(profile.exhaustedUntil, now) &&
-	limitingRemaining(profile.quota) !== 0 &&
-	!!profile.credential.access &&
-	!!profile.credential.refresh;
+	limitingRemaining(profile.quota) !== 0;
 
 export function selectProfile(
 	profiles: RelayProfile[],
@@ -52,6 +47,20 @@ export function selectProfile(
 			source: "priority",
 			consumePriority: true,
 			...(pinned && permanentlyIneligible(pinned) ? { clearPin: true } : {}),
+		};
+	const active = profiles.find(
+		(profile) =>
+			profile.id === overrides.activeProfileId &&
+			isRunnable(profile, now, attempted),
+	);
+	if (active)
+		return {
+			profile: active,
+			source: "active",
+			...(pinned && permanentlyIneligible(pinned) ? { clearPin: true } : {}),
+			...(prioritized && !eligible.includes(prioritized)
+				? { consumePriority: true }
+				: {}),
 		};
 	const ordered = [...eligible].sort(
 		policy === "smart-reset"
@@ -90,6 +99,18 @@ export const earliestFutureReset = (
 
 const future = (value: number | undefined, now: number) =>
 	value !== undefined && value > now;
+const isRunnable = (
+	profile: RelayProfile,
+	now: number,
+	attempted: ReadonlySet<string>,
+) =>
+	profile.enabled &&
+	!profile.needsLogin &&
+	!attempted.has(profile.id) &&
+	!future(profile.skippedUntil, now) &&
+	!future(profile.cooldownUntil, now) &&
+	!!profile.credential.access &&
+	!!profile.credential.refresh;
 const permanentlyIneligible = (profile: RelayProfile) =>
 	!profile.enabled ||
 	!!profile.needsLogin ||

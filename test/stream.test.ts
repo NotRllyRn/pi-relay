@@ -70,7 +70,7 @@ const start = { type: "start", partial: message("pending") } as const;
 const quota = {
 	type: "error",
 	reason: "error",
-	error: message("error", "usage_limit_reached"),
+	error: message("error", "Codex error: The usage limit has been reached"),
 } as const;
 const done = {
 	type: "done",

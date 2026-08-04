@@ -139,7 +139,7 @@ export const classifyFailure = (error: unknown): Failure => {
 	const message = errorMessage(error);
 	if (/abort/i.test(message)) return { kind: "aborted", message };
 	if (
-		/usage_limit_reached|usage_not_included|insufficient_quota|ChatGPT usage limit/i.test(
+		/usage_limit_reached|usage_not_included|insufficient_quota|ChatGPT usage limit|usage limit has been reached/i.test(
 			message,
 		)
 	)

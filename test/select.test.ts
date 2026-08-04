@@ -62,6 +62,30 @@ test("smart reset spends the long window expiring soonest", () => {
 	);
 });
 
+test("keeps the active account until the server rejects it", () => {
+	const active = { ...profile("active", 100), exhaustedUntil: 500 },
+		other = profile("other");
+	assert.equal(
+		selectProfile(
+			[active, other],
+			"smart-reset",
+			{ activeProfileId: active.id },
+			100,
+		).profile?.id,
+		active.id,
+	);
+	assert.equal(
+		selectProfile(
+			[active, other],
+			"smart-reset",
+			{ activeProfileId: active.id },
+			100,
+			new Set([active.id]),
+		).profile?.id,
+		other.id,
+	);
+});
+
 test("most available and priority order are exact", () => {
 	const a = profile("a", 60, 300),
 		b = profile("b", 20, 500);

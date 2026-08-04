@@ -318,6 +318,9 @@ export class RelayController {
 			...(this.prioritizedProfileId
 				? { prioritizedProfileId: this.prioritizedProfileId }
 				: {}),
+			...(this.activeProfileId
+				? { activeProfileId: this.activeProfileId }
+				: {}),
 		};
 	}
 	pin(profile?: RelayProfile): void {
@@ -326,6 +329,7 @@ export class RelayController {
 	}
 	async unpin(): Promise<RelayProfile | undefined> {
 		this.pinnedProfileId = undefined;
+		this.activeProfileId = undefined;
 		const profiles = await this.vault.listProfiles();
 		const state = await this.vault.read();
 		const next = selectProfile(
@@ -485,6 +489,7 @@ export class RelayController {
 		failure: Failure,
 	): Promise<void> {
 		if (failure.kind === "quota") {
+			if (this.activeProfileId === profile.id) this.activeProfileId = undefined;
 			await this.refreshProfile(profile, true).catch(() => undefined);
 			const current = (await this.vault.getProfile(profile.id)) ?? profile;
 			const reset = earliestFutureReset(current) ?? Number.MAX_SAFE_INTEGER;

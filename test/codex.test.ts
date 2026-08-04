@@ -134,6 +134,10 @@ test("detects only duplicate credentials, not shared account ids", async () => {
 	);
 	assert.equal(classifyFailure(new Error("usage_limit_reached")).kind, "quota");
 	assert.equal(
+		classifyFailure(new Error("Codex error: The usage limit has been reached")).kind,
+		"quota",
+	);
+	assert.equal(
 		classifyFailure(new Error("429 too many requests")).kind,
 		"rate-limit",
 	);
